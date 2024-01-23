@@ -85,6 +85,7 @@ EOF
 
 Set SELinux in permissive mode (effectively disabling it). This is required to allow containers to access the host filesystem.
 ```bash
+sudo setenforce 0
 sudo sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
 ```
 
@@ -114,7 +115,7 @@ sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
 ```
 
-Check the cluster nodes
+Check the cluster nodes - the control plane will remain in 'Not Ready' state until the Calico pod networking is applied.
 ```bash
 kubectl get nodes
 ```
@@ -138,6 +139,20 @@ In the Master (Control Plane) Node, check the cluster status (it could take few 
 ```bash
 kubectl get nodes
 ```
+
+## Configure a worker node
+
+Repeat all of the steps up to the Cluster configuation section on one of the worker nodes.
+
+Once the installation is complete, run the output generated from the Kubeadm token create command.
+
+Return to the control plane and re-run the following command until the worker node you have configured has joined the cluster.
+```bash
+kubectl get nodes
+```
+
+Repeat the process for the other worker node.
+
 
 ## Deploy a container to the cluster
 
