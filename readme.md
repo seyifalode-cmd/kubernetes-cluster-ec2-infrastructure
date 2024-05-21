@@ -164,7 +164,7 @@ In the Master (Control Plane) Node, check the cluster status (it could take few 
 kubectl get nodes
 ```
 
-## Master Node
+## Worker Node
 
 ### Configure a worker node
 
