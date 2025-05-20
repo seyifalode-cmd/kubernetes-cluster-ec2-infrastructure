@@ -83,7 +83,23 @@ sudo systemctl enable --now kubelet
 
 ### Cluster Configuration
 
-Copy kube-config.yml to K8s master. Then initialize the cluster and set up kubectl access:
+First, create the kube-config.yml file which is needed for initializing the cluster:
+
+```bash
+# Create kube-config.yml file
+cat <<EOF > kube-config.yml
+apiVersion: kubeadm.k8s.io/v1beta3
+kubernetesVersion: v1.28.2
+kind: ClusterConfiguration
+networking:
+  podSubnet: 192.168.0.0/16
+apiServer:
+  extraArgs:
+   service-node-port-range: 1024-1233
+EOF
+```
+
+Initialize the cluster and set up kubectl access:
 
 ```bash
 # Initialize the Kubernetes cluster with kubeadm
