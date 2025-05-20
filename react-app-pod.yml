@@ -7,12 +7,11 @@ spec:
   selector:
     app: react-app
   ports:
-  - protocol: TCP
-    port: 80
-    nodePort: 1233
+    - protocol: TCP
+      port: 80
+      nodePort: 30000
 
 ---
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -30,7 +29,14 @@ spec:
         app: react-app
     spec:
       containers:
-      - name: react-app
-        image: wessamabdelwahab/react-app:latest
-        ports:
-        - containerPort: 80
+        - name: react-app
+          image: wessamabdelwahab/react-app:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
