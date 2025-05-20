@@ -6,83 +6,57 @@ Follow these steps on all nodes to configure the EC2 for Kubernetes, then instal
 
 ### System Config
 
-You must disable Swap for kubelet to work properly.
+You must disable Swap for kubelet to work properly, set up containerd, and configure system parameters for Kubernetes networking.
 
 ```bash
+# Disable swap
 sudo swapoff -a
 sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
-```
 
-Create containerd configuration file.
-
-```bash
+# Create containerd configuration file
 cat <<EOF | sudo tee /etc/modules-load.d/containerd.conf
 overlay
 br_netfilter
 EOF
-```
 
-Load modules.
-
-```bash
+# Load modules
 sudo modprobe overlay
 sudo modprobe br_netfilter
-```
 
-Setup required sysctl params for Kubernetes networking, this ensure that iptables correctly see bridged traffic
-
-```bash
+# Setup required sysctl params for Kubernetes networking
+# This ensures that iptables correctly see bridged traffic
 cat <<EOF | sudo tee /etc/sysctl.d/99-kubernetes-cri.conf
 net.bridge.bridge-nf-call-iptables = 1
 net.ipv4.ip_forward = 1
 net.bridge.bridge-nf-call-ip6tables = 1
 EOF
-```
 
-Apply sysctl params without reboot
-
-```bash
+# Apply sysctl params without reboot
 sudo sysctl --system
-```
 
-Install the containerd.io package from the official Docker repositories
-
-```bash
+# Install containerd from official Docker repositories
 sudo yum update -y
 sudo yum install -y containerd
-```
 
-Create configuration directory for containerd
-
-```bash
+# Create configuration directory for containerd
 sudo mkdir -p /etc/containerd
-```
 
-Generate containerd configuration and save the configuration file in the created directory
-
-```bash
+# Generate containerd configuration
 containerd config default | sudo tee /etc/containerd/config.tom
-```
 
-Restart containerd to ensure it use the newly created configuration file
-
-```bash
+# Restart containerd to apply the new configuration
 sudo systemctl restart containerd
-```
 
-Verify that containerd is running
-
-```bash
+# Verify that containerd is running
 sudo systemctl status containerd
 ```
 
 ### Kubernetes Install
 
-Install kubeadm, kubelet and kubectl
-
-Download the Google Cloud public signing key
+Install kubeadm, kubelet and kubectl:
 
 ```bash
+# Download the Google Cloud public signing key and set up Kubernetes repo
 cat <<EOF | sudo tee /etc/yum.repos.d/kubernetes.repo
 [kubernetes]
 name=Kubernetes
@@ -92,24 +66,16 @@ gpgcheck=1
 gpgkey=https://pkgs.k8s.io/core:/stable:/v1.28/rpm/repodata/repomd.xml.key
 exclude=kubelet kubeadm kubectl cri-tools kubernetes-cni
 EOF
-```
 
-Set SELinux in permissive mode (effectively disabling it). This is required to allow containers to access the host filesystem.
-
-```bash
+# Set SELinux in permissive mode (effectively disabling it)
+# This is required to allow containers to access the host filesystem
 sudo setenforce 0
 sudo sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
-```
 
-Install kubelet, kubeadm and kubectl
-
-```bash
+# Install kubelet, kubeadm and kubectl
 sudo yum install -y kubelet-1.28.2 kubeadm-1.28.2 kubectl-1.28.2 --disableexcludes=kubernetes
-```
 
-Enable kubelet
-
-```bash
+# Enable kubelet
 sudo systemctl enable --now kubelet
 ```
 
@@ -117,47 +83,47 @@ sudo systemctl enable --now kubelet
 
 ### Cluster Configuration
 
-Copy kube-config.yml to K8s master.
-
-Initialize the Kubernetes cluster with kubeadm and passing the created config file
+First, create the kube-config.yml file which is needed for initializing the cluster:
 
 ```bash
-sudo kubeadm init --config kube-config.yml --ignore-preflight-errors=all
+# Create kube-config.yml file
+cat <<EOF > kube-config.yml
+apiVersion: kubeadm.k8s.io/v1beta3
+kubernetesVersion: v1.28.2
+kind: ClusterConfiguration
+networking:
+  podSubnet: 192.168.0.0/16
+apiServer:
+  extraArgs:
+   service-node-port-range: 1024-1233
+EOF
 ```
 
-Set kubectl access
+Initialize the cluster and set up kubectl access:
 
 ```bash
+# Initialize the Kubernetes cluster with kubeadm
+sudo kubeadm init --config kube-config.yml --ignore-preflight-errors=all
+
+# Set kubectl access
 mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
-```
 
-Check the cluster nodes - the control plane will remain in 'Not Ready' state until the Calico pod networking is applied.
-
-```bash
+# Check the cluster nodes (control plane will be in 'Not Ready' state until Calico is applied)
 kubectl get nodes
-```
 
-Apply Calico pod networking configuration on the master
-
-```bash
+# Apply Calico pod networking configuration
 kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
-```
 
-Check the cluster nodes (it could take few moments until the node become available)
-
-```bash
+# Check the cluster nodes again (may take a few moments to become available)
 kubectl get nodes
-```
 
-In the Master (Control Plane) Node, create a token by running this command. Copy the output to the worker nodes, but prefix the auotgenerated command with sudo
-
-```bash
+# Create a token for worker nodes to join (copy the output to use on worker nodes)
 kubeadm token create --print-join-command
 ```
 
-In the Master (Control Plane) Node, check the cluster status (it could take few moments until the worker nodes become available)
+In the Master (Control Plane) Node, check the cluster status periodically until all nodes are available:
 
 ```bash
 kubectl get nodes
@@ -167,34 +133,32 @@ kubectl get nodes
 
 ### Configure a worker node
 
-Repeat all of the steps up to the Cluster configuation section on one of the worker nodes.
+Repeat all of the "System Config" and "Kubernetes Install" steps from above on each worker node.
 
-Once the installation is complete, run the output generated from the Kubeadm token create command.
+Once the installation is complete, run the join command output generated from the `kubeadm token create --print-join-command` (make sure to prefix with sudo):
 
-Return to the control plane and re-run the following command until the worker node you have configured has joined the cluster.
+```bash
+# Example (your actual command will be different):
+sudo kubeadm join 192.168.1.10:6443 --token abcdef.0123456789abcdef --discovery-token-ca-cert-hash sha256:1234...
+```
+
+Return to the control plane and run the following command until all worker nodes have joined the cluster:
 
 ```bash
 kubectl get nodes
 ```
 
-Repeat the process for the other worker node.
-
 ## Deploy a container to the cluster
 
-Copy react-app-pod.yml to the naster node and apply.
+Copy react-app-pod.yml to the master node and apply:
 
 ```bash
+# Create the deployment
 kubectl create -f react-app-pod.yml
-```
 
-Verify that the pod is up and running.
-
-```bash
+# Verify that the pod is up and running
 kubectl get pods -o wide
-```
 
-Verify that the deployment complete.
-
-```bash
+# Verify that the deployment is complete
 kubectl get deployment
 ```
