@@ -35,7 +35,7 @@ resource "aws_instance" "k8s-master" {
 #====================
 resource "aws_instance" "k8s-nodes" {
   count = 2
-  instance_type               = "t2.micro"
+  instance_type               = "t3.micro"
   ami                         = data.aws_ssm_parameter.webserver-ami.value
   tags = {
     Name = "k8s_node_${count.index}"
