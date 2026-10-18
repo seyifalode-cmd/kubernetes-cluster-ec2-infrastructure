@@ -1,4 +1,44 @@
-# Kubernetes Cluster on EC2s
+# Kubernetes Cluster on EC2
+
+Oluwaseyi Michael Falode | Cloud & DevOps Engineering | Toronto, ON
+
+A self-managed Kubernetes cluster built from scratch on AWS: Terraform provisions the network and three EC2 instances, then kubeadm bootstraps one control-plane node and two workers with containerd and Calico networking. A sample React app is deployed behind a NodePort service to prove the cluster schedules and serves workloads.
+
+---
+
+## Project at a Glance
+
+| | |
+|---|---|
+| **Tools Used** | Terraform, kubeadm, kubelet, kubectl, containerd, Calico |
+| **Platform** | AWS (us-east-1) — VPC with two public subnets, 1 control-plane + 2 worker EC2 instances |
+| **Languages** | HCL (Terraform), YAML, Bash |
+| **What It Does** | Provisions EC2 infrastructure, installs a container runtime and Kubernetes components on every node, initializes the control plane, joins workers with a token, and deploys a 2-replica app exposed on NodePort 30000 |
+
+## Repository Structure
+
+```
+kubernetes-cluster-ec2-infrastructure/
+├── main.tf              # Root module: AWS provider, vpc and compute modules
+├── variables.tf         # Region
+├── outputs.tf           # Node IPs
+├── modules/
+│   ├── vpc/             # VPC, two public subnets, security group
+│   └── compute/         # k8s-master and two k8s-node EC2 instances
+├── kube-config.yml      # kubeadm ClusterConfiguration (pod subnet, NodePort range)
+└── react-app-pod.yml    # Sample Deployment (2 replicas) + NodePort Service
+```
+
+## How to Reproduce
+
+```bash
+terraform init
+terraform apply          # creates the VPC and the three EC2 instances
+```
+
+Then follow the node-setup steps below on each instance, initialize the control plane, join the workers, and deploy the sample app. Run `terraform destroy` when finished to avoid ongoing EC2 charges.
+
+---
 
 ## Master Node & Worker Nodes
 
